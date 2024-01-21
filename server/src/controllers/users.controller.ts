@@ -1,7 +1,9 @@
-import Users from "../models/users.model";
 import * as bcrypt from "bcrypt";
-import { checkPassword, newToken } from "../utils/helper";
+import * as jwt from "jsonwebtoken";
+import JWT from "../configs/jwt.config";
 import { sendResponseError } from "../middleware/middleware";
+import Users from "../models/users.model";
+import { checkPassword, newToken } from "../utils/helper";
 
 const signUp = async (req, res) => {
   const { password } = req.body;
@@ -20,7 +22,6 @@ const signUp = async (req, res) => {
 
 const signIn = async (req, res) => {
   const { password, email } = req.body;
-  console.log(req.body);
   try {
     const user = await Users.findOne({ email });
     console.log(user);
@@ -41,4 +42,27 @@ const signIn = async (req, res) => {
   }
 };
 
-export { signUp, signIn };
+const getUser = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  console.log({ token });
+  if (token == null) return sendResponseError(401, "Unauthorized", res);
+
+  jwt.verify(token, JWT.jwt, async (err: any, user: any) => {
+    console.log(err);
+
+    if (err) return res.sendStatus(403);
+
+    req.user = user;
+    const existingUser = await Users.findOne({ _id: user.id });
+
+    if (!existingUser) {
+      return sendResponseError(404, "User not found", res);
+    }
+
+    res.status(200).send({ status: "ok", user: existingUser });
+    return;
+  });
+};
+
+export { getUser, signIn, signUp };
